@@ -1,5 +1,0 @@
-# Optional HonestDiD sensitivity stage. honestdid depends on PyTorch, which on Linux
-# installs several GB of CUDA libraries by default; for the CPU-only build run first:
-#   python -m pip install torch --index-url https://download.pytorch.org/whl/cpu
--r requirements.txt
-honestdid==0.1.1

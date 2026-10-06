@@ -1,0 +1,91 @@
+# Settings for project.py: which files to read, what their columns mean, and which
+# controls and models to use. Edit and save, then choose r (reload) in the menu.
+#
+# Column names are matched after "cleaning": lower case, with spaces and punctuation
+# turned into "_" (so "FVI_CSCE_AB" becomes "fvi_csce_ab" and "Median income" becomes
+# "median_income"). You can write them either way here.
+
+[data]
+# Every file listed is read (CSV or Excel; paths are relative to this file). A file is:
+#  - a municipal panel: the unit column and a time column (a row per municipality and period)
+#  - one row per municipality: the unit column only (like the zoning bylaw file)
+#  - a time series: a time column and one column per series, no unit column. Bank of
+#    Canada Valet CSV downloads can be listed as they are.
+# A time column is one named date, ref_date, period, quarter, year, month or time. It can
+# hold years, quarters (2015Q1) or dates; the spacing of the dates sets the frequency.
+files = [
+    "data/starts_quarterly.csv",
+    "data/permits_annual.csv",
+    "data/municipal_controls.csv",
+    "data/zoning_bylaws.csv",
+    "data/boc_valet.csv",
+    "data/cpi_shelter.csv",
+]
+unit = "municipality"   # the id column shared by the municipal files
+region = "province"     # each municipality's province, for regional series (see below)
+
+[rename]
+# Readable names for coded columns, in every file: "name in the file" = "name to use".
+V39079 = "policy_rate"
+
+[outcomes]
+starts = "starts"     # Section 3: housing starts, quarterly (StatCan, revised)
+permits = "permits"   # Section 4: building permits, annual
+transform = "log"     # "log" (drops zeros), "log1p" (keeps zeros) or "none"
+
+[treatment]
+# The bylaw file has a row per bylaw. A municipality's earliest bylaw starts its
+# treatment; municipalities without a bylaw are the comparison group.
+vote_date = "council_vote_date"
+effective_date = "effective_date"
+use = "effective"                # the date treatment starts: "effective" or "vote"
+score = "bylaw_score"            # optional: effects above and below the median score
+zoning_type = "zoning_type"      # optional: effects by zoning type
+initiative = "initiative_type"   # optional: effects by type of housing initiative
+
+[controls]
+# Add or delete lines to change the controls; the menu can also switch them off for a
+# session. A series that is the same for every municipality (such as the policy rate) is
+# absorbed by the period fixed effects of the DiD and used in pooled OLS only.
+use = [
+    "pop_growth",
+    "population",
+    "pop_density",
+    "median_income",
+    "market_barometer",   # built from the series in [market_barometer]
+    "cpi_shelter",
+    "policy_rate",
+]
+
+[market_barometer]
+# Series averaged into one regional control, each standardized first (z-score within
+# region). {region} stands for each municipality's region code. Put "-" in front of a
+# series that moves against the market, e.g.
+#   series = ["fvi_csce_{region}", "-broker_average_5yr_vrm"]
+series = ["fvi_csce_{region}"]
+
+[regions]
+# Province -> region code in regional series names. Provinces not listed keep their own
+# code, so Alberta matches fvi_csce_ab. The province column can hold codes or names.
+NB = "ATL"
+NL = "ATL"
+NS = "ATL"
+PE = "ATL"
+
+[ols]
+# Section 2: one model per line, "outcome ~ regressor"; add regressors with " + ".
+# Each model runs at its outcome's frequency (starts quarterly, permits annual).
+models = [
+    "permits ~ population",
+    "starts ~ population",
+]
+logs = true   # logs of both sides, so slopes are elasticities
+
+[did]
+window_quarterly = [-8, 12]   # event window in quarters (Section 3); the ends pool the rest
+window_annual = [-4, 6]       # event window in years (Section 4)
+placebo_shift_quarterly = 8   # Section 1 placebo: pretend adoption came this much earlier
+placebo_shift_annual = 2
+
+[output]
+folder = "output"   # each run makes a new dated folder in here
