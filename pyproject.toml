@@ -1,0 +1,11 @@
+[project]
+name = "panel-did-toolkit"
+version = "3.0.0"
+description = "Panel difference-in-differences toolkit with an interactive menu"
+requires-python = ">=3.11"  # pandas 3 needs Python 3.11+
+
+[tool.ruff]
+line-length = 100
+
+[tool.ruff.lint]
+select = ["E", "F", "W", "B", "UP", "SIM", "RUF"]
