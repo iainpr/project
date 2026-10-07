@@ -46,6 +46,7 @@ from rich.console import Console
 from rich.panel import Panel
 from rich.table import Table
 
+__version__ = "4.0.0"
 ROOT = Path(__file__).resolve().parent
 TIME_COLUMNS = ("date", "ref_date", "period", "quarter", "year", "month", "time")
 FREQ_NAME = {"D": "daily", "M": "monthly", "Q": "quarterly", "Y": "annual"}
@@ -1218,6 +1219,7 @@ def provenance(study: Study) -> dict:
             versions[package] = importlib.metadata.version(package)
     return {
         "created": datetime.now().isoformat(timespec="seconds"),
+        "program": f"project.py {__version__}",
         "python": platform.python_version(),
         "packages": versions,
         "data_sha256": {
@@ -1348,7 +1350,7 @@ class App:
     def main(self) -> int:
         self.say(
             Panel.fit(
-                f"[bold]Zoning bylaws and housing supply[/bold]\nStaggered "
+                f"[bold]Zoning bylaws and housing supply[/bold] · v{__version__}\nStaggered "
                 f"difference-in-differences · settings from {self.config}"
             )
         )

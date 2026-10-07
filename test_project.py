@@ -277,7 +277,8 @@ def test_sections_on_demo_data(study):
     files = {f.name for f in folder.iterdir()}
     assert {"index.html", "run_info.json", "s3_starts_event_study.csv", "ols.tex"} <= files
     assert {"s3_starts_event_study.png", "s2_log_permits_vs_log_population.png"} <= files
-    assert '"data_sha256"' in (folder / "run_info.json").read_text(encoding="utf-8")
+    info = (folder / "run_info.json").read_text(encoding="utf-8")
+    assert '"data_sha256"' in info and f'"program": "project.py {P.__version__}"' in info
 
 
 def test_html_is_escaped(study):
