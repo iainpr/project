@@ -1,8 +1,8 @@
 [project]
-name = "panel-did-toolkit"
-version = "3.0.0"
-description = "Panel difference-in-differences toolkit with an interactive menu"
-requires-python = ">=3.11"  # pandas 3 needs Python 3.11+
+name = "zoning-housing-did"
+version = "4.0.0"
+description = "Staggered difference-in-differences for zoning bylaws and housing supply"
+requires-python = ">=3.11"  # pandas 3 and tomllib need Python 3.11+
 
 [tool.ruff]
 line-length = 100
