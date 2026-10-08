@@ -1,5 +1,66 @@
 # Zoning bylaws and housing supply
 
+Two programs:
+
+- **`baseline.py`**: baseline OLS on one final dataset, written to a single PDF. Start
+  here to see whether a DiD or RDD design is worth building.
+- **`project.py`**: the full staggered difference-in-differences toolkit, with a
+  terminal menu.
+
+## Baseline regressions: `baseline.py`
+
+```
+python baseline.py data/final.xlsx              # writes data/final_baseline.pdf
+python baseline.py data/final.csv -o report.pdf
+```
+
+The dataset is one `.csv` or `.xlsx` table with a row per census division and period
+(monthly, quarterly or annual). Set the column names, the frequency and the controls
+in the SETTINGS block at the top of `baseline.py`. Names are matched ignoring case,
+spaces and punctuation, so `CPI Shelter` matches `cpi_shelter`. If a column is
+missing, the program lists the file's columns and the closest match.
+
+| Setting | Default | Meaning |
+|---|---|---|
+| `UNIT`, `TIME`, `FREQ` | `census_division`, `date`, `"Q"` | the panel: id, period (dates, years or `2015Q1`), frequency |
+| `SCORE` | `score` | the internal zoning score |
+| `OUTCOMES` | `permits`, `starts` | Table 34-10-0292-01 permits; CMHC starts |
+| `TREATED` | `treatment_date` | the date the bylaw took effect; blank if never |
+| `CONTROLS` | mortgage lending, development charges, BCPI, NHPI, CPI shelter, unemployment | added in models (3) and (4) |
+| `EXTRA` | `completions`, `under_construction` | summary statistics only |
+| `LOG`, `CUTOFF`, `WINDOW` | `True`, `None`, `8` | log(1 + outcome); a score threshold to mark (RDD check); pre-trend window |
+
+The models, with standard errors clustered by census division:
+
+```
+(1) permits ~ score        (3) permits ~ score + post + controls
+(2) starts ~ score         (4) starts ~ score + post + controls
+```
+
+`post` is 1 from the period the bylaw took effect. The PDF has five parts:
+
+1. Data and summary statistics: sample, missing values, means before the first bylaw
+   (adopters against never-adopters), correlations.
+2. Trends and pre-trends: mean outcomes by period for both groups, and the adopter
+   gap by period since adoption, measured from the period before (95% band).
+3. The score: its distribution, and binned means of each outcome by score with the
+   OLS line (split at `CUTOFF` when set).
+4. The regression table with diagnostics: R-squared, Breusch-Pagan, Jarque-Bera,
+   Durbin-Watson, RESET and the largest variance inflation factor. It also has a
+   pre-trend test: the difference in pre-adoption slopes, with division fixed effects.
+5. Residual plots for models (3) and (4).
+
+These are associations, not causal effects. `baseline.py` reads only the columns it
+needs, refuses files over `MAX_MB`, never turns column names into code (models are
+built from arrays, not formula strings), and writes the PDF to a temporary file first.
+It needs only numpy, pandas, matplotlib, statsmodels, openpyxl and defusedxml:
+
+```
+python -m pip install numpy==2.3.5 pandas==3.0.6 matplotlib==3.11.2 statsmodels==0.15.0 openpyxl==3.1.5 defusedxml==0.7.1
+```
+
+## The DiD toolkit: `project.py`
+
 `project.py` measures how municipal zoning bylaws change housing starts (quarterly) and
 building permits (annual), using staggered difference-in-differences. It runs from a
 terminal menu, and every setting lives in one file, `config.toml`.
@@ -116,6 +177,8 @@ Without the menu: `python project.py --run 3 4` (or `--run all`).
 python -m pytest -q
 ```
 
-The tests cover the settings, file reading, frequency matching, treatment timing, the
-four sections on the demo data (including that the placebo is near zero and the known
-effect is recovered), the HTML output and a scripted menu session.
+`test_project.py` covers the settings, file reading, frequency matching, treatment
+timing, the four sections on the demo data (including that the placebo is near zero and
+the known effect is recovered), the HTML output and a scripted menu session.
+`test_baseline.py` checks that `baseline.py` recovers a known slope, detects a planted
+pre-trend, reads CSV and Excel, and still writes a report when nobody has adopted.
