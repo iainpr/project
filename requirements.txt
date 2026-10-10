@@ -10,7 +10,8 @@ openpyxl==3.1.5
 defusedxml==0.7.1   # lets openpyxl parse Excel files without XML attacks
 rich==15.0.0
 pyfixest==0.60.0
-statsmodels==0.15.0   # baseline.py
+statsmodels==0.15.0   # baseline.py and portal.py
+scipy==1.17.1         # portal.py (also needed by statsmodels)
 py-did-multiplegt-dyn==0.1.9
 polars==1.44.2
 

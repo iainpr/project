@@ -1,9 +1,11 @@
 # Zoning bylaws and housing supply
 
-Two programs:
+Three programs:
 
 - **`baseline.py`**: baseline OLS on one final dataset, written to a single PDF. Start
   here to see whether a DiD or RDD design is worth building.
+- **`portal.py`**: a local web page for trying models on any `.xlsx` or `.csv` file:
+  OLS, panel fixed effects, cross-section, DiD and RDD.
 - **`project.py`**: the full staggered difference-in-differences toolkit, with a
   terminal menu.
 
@@ -58,6 +60,53 @@ It needs only numpy, pandas, matplotlib, statsmodels, openpyxl and defusedxml:
 ```
 python -m pip install numpy==2.3.5 pandas==3.0.6 matplotlib==3.11.2 statsmodels==0.15.0 openpyxl==3.1.5 defusedxml==0.7.1
 ```
+
+## Regression portal: `portal.py`
+
+```
+python portal.py                    # the files in data/, at http://127.0.0.1:8765
+python portal.py --data ~/thesis/data --port 8800 --no-browser
+```
+
+Put the `.xlsx` or `.csv` files in `data/` (or pass `--data`), and the page opens in your
+browser. Choose a file (and sheet), a model and its variables, then press **Run model**
+(or Ctrl+Enter). The Data tab describes every column: its kind, missing values, mean,
+standard deviation and range. The page guesses the unit, time, treatment date, outcome
+and score columns from their names, and remembers your settings for each file.
+
+| Model | Estimates | Also shows |
+|---|---|---|
+| OLS | pooled OLS of the outcome on the regressors and controls | Breusch-Pagan, Jarque-Bera, RESET, largest VIF, Durbin-Watson; the outcome against the first regressor with the others held fixed; residuals |
+| Panel FE | the within estimator, with unit fixed effects, time fixed effects or both | within R²; which regressors the fixed effects absorb |
+| Cross-section | one row per unit: unit averages (the between estimator) or a single period | as OLS, with a dot per unit |
+| DiD | staggered DiD by two-way fixed effects against never-treated units: the average effect after treatment and an event study (reference t = -1) | a pre-trend test; mean outcomes of treated and never-treated units by period |
+| RDD | sharp RD: a local linear or quadratic fit on each side of a cutoff, with a triangular or uniform kernel (default bandwidth: one standard deviation) | a bunching test, placebo jumps in the controls, the jump at other bandwidths |
+
+The outcome can be logged (`log(y)` drops zeros; `log(1 + y)` keeps them). Standard
+errors are clustered by unit, with t and F tests on units - 1 degrees of freedom (as in
+Stata); OLS, the cross-section and RDD can use robust (HC1) or classical errors instead.
+The treatment date column holds each unit's first treated period, blank if never.
+
+The pre-trend p-value comes from a wild bootstrap that flips the sign of each unit's
+score (Kline and Santos 2012). With few treated units the usual clustered Wald test
+rejects too often: in 100 simulated panels with no pre-trend and 15 of 30 units
+treated, it rejected 27% of the time at the 5% level, against 6% for the bootstrap.
+In panel data the RDD counts units, not rows, since a unit's score repeats in every
+period. Two-way fixed effects can be biased when effects differ by adoption date;
+`project.py` has did2s and dCDH for that.
+
+**Pin for comparison** lines models up side by side on the Compare tab, and each result
+downloads as CSV or prints to PDF. Charts are drawn in the page; hover over a point for
+its values.
+
+Everything stays on your computer. The server answers only on 127.0.0.1 and checks the
+Host header (against DNS rebinding) and a token made for each session (against other
+websites). It opens only files listed in the data folder, never a path from the page,
+and refuses files over 200 MB. It keeps at most two files in memory, runs
+one model at a time, and draws at most 2,000 points per chart. Column names are never
+turned into code, and the page shows data as plain text, under a strict Content
+Security Policy. It needs numpy, pandas, scipy, statsmodels and openpyxl (with
+defusedxml); a model takes well under a second, and the server uses 200-250 MB.
 
 ## The DiD toolkit: `project.py`
 
@@ -182,3 +231,6 @@ timing, the four sections on the demo data (including that the placebo is near z
 the known effect is recovered), the HTML output and a scripted menu session.
 `test_baseline.py` checks that `baseline.py` recovers a known slope, detects a planted
 pre-trend, reads CSV and Excel, and still writes a report when nobody has adopted.
+`test_portal.py` runs the portal's server: its security checks, each model against
+known answers (including that the pre-trend test catches a planted trend but keeps its
+size), and clear messages for bad requests.

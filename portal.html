@@ -1,0 +1,535 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Regression portal</title>
+<style nonce="{{nonce}}">
+:root {
+  color-scheme: light;
+  --surface: #fcfcfb; --page: #f9f9f7; --ink: #0b0b0b; --ink2: #52514e; --muted: #898781;
+  --grid: #e1e0d9; --axis: #c3c2b7; --line: rgba(11, 11, 11, .10); --wash: rgba(42, 120, 214, .10);
+  --s1: #2a78d6; --s2: #eb6834; --s3: #1baf7a; --critical: #d03b3b;
+}
+@media (prefers-color-scheme: dark) {
+  :root {
+    color-scheme: dark;
+    --surface: #1a1a19; --page: #0d0d0d; --ink: #ffffff; --ink2: #c3c2b7; --muted: #898781;
+    --grid: #2c2c2a; --axis: #383835; --line: rgba(255, 255, 255, .10); --wash: rgba(57, 135, 229, .16);
+    --s1: #3987e5; --s2: #d95926; --s3: #199e70;
+  }
+}
+* { box-sizing: border-box; }
+body { margin: 0; font: 14px/1.45 system-ui, -apple-system, "Segoe UI", sans-serif; color: var(--ink); background: var(--page); }
+header { display: flex; align-items: baseline; gap: 12px; padding: 12px 20px; border-bottom: 1px solid var(--line); background: var(--surface); }
+header h1 { font-size: 16px; margin: 0; }
+header span { min-width: 0; color: var(--muted); font-size: 12px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.layout { display: grid; grid-template-columns: 340px minmax(0, 1fr); min-height: calc(100vh - 47px); }
+aside { padding: 4px 20px 20px; border-right: 1px solid var(--line); background: var(--surface); }
+main { padding: 12px 24px 32px; }
+@media (max-width: 880px) {
+  .layout { grid-template-columns: minmax(0, 1fr); }
+  aside { border-right: 0; border-bottom: 1px solid var(--line); }
+  header, aside, main { padding-left: 16px; padding-right: 16px; }
+}
+h2 { font-size: 12px; font-weight: 600; text-transform: uppercase; letter-spacing: .05em; color: var(--ink2); margin: 20px 0 6px; }
+label, .label { display: block; margin: 8px 0 0; color: var(--ink2); font-size: 13px; }
+select, input { display: block; width: 100%; margin-top: 3px; padding: 6px 8px; font: inherit; color: var(--ink); background: var(--page); border: 1px solid var(--axis); border-radius: 6px; }
+input[type=checkbox] { display: inline; width: auto; margin: 0; accent-color: var(--s1); }
+:focus-visible { outline: 2px solid var(--s1); outline-offset: 1px; }
+.row { display: flex; gap: 8px; } .row > * { flex: 1; min-width: 0; }
+.seg { display: grid; grid-template-columns: repeat(3, 1fr); gap: 4px; }
+.seg button { padding: 6px 4px; }
+.seg button[aria-pressed=true] { background: var(--s1); border-color: var(--s1); color: #fff; }
+.checks { max-height: 160px; overflow-y: auto; margin-top: 3px; padding: 4px 8px; border: 1px solid var(--axis); border-radius: 6px; background: var(--page); }
+.checks label { display: flex; gap: 8px; align-items: center; margin: 3px 0; color: var(--ink); }
+button { font: inherit; padding: 6px 12px; color: var(--ink); background: var(--surface); border: 1px solid var(--axis); border-radius: 6px; cursor: pointer; }
+button:hover { border-color: var(--ink2); }
+button.primary { width: 100%; margin-top: 18px; padding: 10px; color: #fff; background: var(--s1); border-color: var(--s1); font-weight: 600; }
+button:disabled { opacity: .6; cursor: progress; }
+.hint { margin: 6px 0 0; color: var(--muted); font-size: 12px; }
+[hidden] { display: none !important; }
+.tabs { display: flex; gap: 4px; margin-bottom: 8px; border-bottom: 1px solid var(--line); }
+.tabs button { border: 0; border-bottom: 2px solid transparent; border-radius: 0; background: none; color: var(--ink2); padding: 8px 12px; }
+.tabs button[aria-selected=true] { color: var(--ink); border-bottom-color: var(--s1); }
+.title { font-size: 18px; margin: 12px 0 2px; }
+.tiles { display: grid; grid-template-columns: repeat(auto-fill, minmax(150px, 1fr)); gap: 8px; margin: 14px 0; }
+.tile { padding: 10px 12px; background: var(--surface); border: 1px solid var(--line); border-radius: 8px; }
+.tile div:first-child { color: var(--ink2); font-size: 12px; }
+.tile div:last-child { font-size: 20px; font-weight: 600; }
+.toolbar { display: flex; flex-wrap: wrap; gap: 8px; }
+.card { margin: 12px 0; padding: 12px 14px; background: var(--surface); border: 1px solid var(--line); border-radius: 8px; overflow-x: auto; }
+.card h3 { margin: 0 0 8px; font-size: 13px; font-weight: 600; }
+table { width: 100%; border-collapse: collapse; font-variant-numeric: tabular-nums; }
+th, td { padding: 5px 10px; text-align: right; white-space: nowrap; border-bottom: 1px solid var(--grid); }
+th:first-child, td:first-child { text-align: left; }
+th { color: var(--ink2); font-size: 12px; font-weight: 500; }
+tr.sig td:nth-child(2) { font-weight: 600; }
+.charts { display: grid; grid-template-columns: repeat(auto-fit, minmax(min(380px, 100%), 1fr)); gap: 0 12px; }
+svg.chart { display: block; width: 100%; height: auto; }
+svg text { fill: var(--muted); font-size: 11px; }
+svg .label { fill: var(--ink2); font-size: 12px; }
+svg .grid { stroke: var(--grid); }
+svg .axis { stroke: var(--axis); }
+.c0 { --c: var(--ink2); } .c1 { --c: var(--s1); } .c2 { --c: var(--s2); } .c3 { --c: var(--s3); }
+svg .line { fill: none; stroke: var(--c); stroke-width: 2; stroke-linejoin: round; stroke-linecap: round; }
+svg .dot { fill: var(--c); stroke: var(--surface); stroke-width: 2; }
+svg .dot.small { stroke: none; fill-opacity: .45; }
+svg .hollow { fill: var(--surface); stroke: var(--c); stroke-width: 2; }
+svg .whisker { stroke: var(--c); stroke-width: 2; stroke-linecap: round; }
+svg .bar { fill: var(--c); }
+svg .focus { fill: none; stroke: var(--ink); stroke-width: 1.5; }
+#tip { position: fixed; z-index: 9; padding: 6px 8px; pointer-events: none; font-size: 12px; color: var(--ink); background: var(--surface); border: 1px solid var(--axis); border-radius: 6px; box-shadow: 0 2px 8px rgba(0, 0, 0, .12); }
+.error { border-left: 3px solid var(--critical); }
+.notes { margin: 0; padding-left: 18px; color: var(--ink2); }
+@media print {
+  header, aside, .tabs, .toolbar, #tip, svg .focus { display: none !important; }
+  .layout { display: block; } main { padding: 0; } .card { break-inside: avoid; }
+}
+</style>
+</head>
+<body>
+<header><h1>Regression portal</h1><span id="where"></span></header>
+<div class="layout">
+<aside>
+  <h2>Data</h2>
+  <label>File <select id="file"></select></label>
+  <label id="sheet-box" hidden>Sheet <select id="sheet"></select></label>
+  <p class="hint" id="file-hint"></p>
+
+  <h2>Model</h2>
+  <div class="seg" id="models">
+    <button type="button" data-model="ols">OLS</button>
+    <button type="button" data-model="fe">Panel FE</button>
+    <button type="button" data-model="xs">Cross-section</button>
+    <button type="button" data-model="did">DiD</button>
+    <button type="button" data-model="rdd">RDD</button>
+  </div>
+  <p class="hint" id="model-hint"></p>
+
+  <h2>Variables</h2>
+  <label>Outcome <select id="y" data-kinds="number"></select></label>
+  <label>Transform <select id="transform">
+    <option value="none">none</option><option value="log1p">log(1 + y), keeps zeros</option><option value="log">log(y)</option>
+  </select></label>
+  <div data-show="ols fe xs"><span class="label">Regressors of interest</span><div class="checks" id="x"></div></div>
+  <div data-show="did">
+    <label>Treatment date <select id="treat" data-kinds="date text number"></select></label>
+    <p class="hint">The period each unit is first treated; blank if never.</p>
+    <div class="row">
+      <label>Event window from <input id="lo" type="number" value="-8" max="-2" step="1"></label>
+      <label>to <input id="hi" type="number" value="8" min="0" step="1"></label>
+    </div>
+  </div>
+  <div data-show="rdd">
+    <label>Running variable <select id="running" data-kinds="number"></select></label>
+    <div class="row">
+      <label>Cutoff <input id="cutoff" type="number" step="any"></label>
+      <label>Bandwidth <input id="bandwidth" type="number" step="any" min="0" placeholder="auto: 1 sd"></label>
+    </div>
+    <div class="row">
+      <label>Kernel <select id="kernel"><option value="triangular">triangular</option><option value="uniform">uniform</option></select></label>
+      <label>Fit <select id="order"><option value="1">linear</option><option value="2">quadratic</option></select></label>
+    </div>
+  </div>
+  <span class="label">Controls</span><div class="checks" id="controls"></div>
+
+  <h2>Panel</h2>
+  <div class="row">
+    <label>Unit <select id="unit" data-kinds="text number" data-optional></select></label>
+    <label>Time <select id="time" data-kinds="date number text" data-optional></select></label>
+  </div>
+  <div data-show="fe"><span class="label">Fixed effects</span>
+    <div class="row checks"><label><input type="checkbox" id="fe-unit" checked> unit</label><label><input type="checkbox" id="fe-time" checked> time</label></div>
+  </div>
+  <div data-show="xs" class="row">
+    <label>One row per unit from <select id="xs_mode"><option value="mean">the average of all periods</option><option value="period">one period</option></select></label>
+    <label id="xs-period-box" hidden>Period <input id="xs_period" placeholder="e.g. 2020Q1"></label>
+  </div>
+  <label data-show="ols xs rdd">Standard errors <select id="se">
+    <option value="cluster">clustered by unit</option><option value="robust">robust (HC1)</option><option value="classical">classical</option>
+  </select></label>
+  <p class="hint" data-show="fe did">Standard errors are clustered by unit.</p>
+  <button id="run" class="primary" type="button">Run model</button>
+  <p class="hint">Ctrl+Enter also runs it. Settings are remembered for each file.</p>
+</aside>
+<main>
+  <nav class="tabs" role="tablist">
+    <button type="button" role="tab" data-tab="data">Data</button>
+    <button type="button" role="tab" data-tab="results">Results</button>
+    <button type="button" role="tab" data-tab="compare">Compare</button>
+  </nav>
+  <section id="data" role="tabpanel"></section>
+  <section id="results" role="tabpanel"><p class="hint">Choose a model and its variables, then press Run model.</p></section>
+  <section id="compare" role="tabpanel"></section>
+</main>
+</div>
+<div id="tip" hidden></div>
+<script nonce="{{nonce}}">
+"use strict";
+const TOKEN = "{{token}}";
+const $ = (id) => document.getElementById(id);
+const state = {profile: null, model: "ols", se: "cluster", pinned: []};
+const HINTS = {
+  ols: "Pooled OLS of the outcome on the regressors and controls.",
+  fe: "The within estimator, with unit fixed effects, time fixed effects or both.",
+  xs: "One row per unit: unit averages (the between estimator) or a single period.",
+  did: "Staggered difference-in-differences against never-treated units: the average effect, an event study and a pre-trend test.",
+  rdd: "Sharp regression discontinuity: local linear or quadratic fits on each side of a cutoff.",
+};
+
+// DOM builder: text always goes through textContent, so data can never inject markup.
+function el(tag, props = {}, ...children) {
+  const svg = tag.startsWith("svg:");
+  const node = svg ? document.createElementNS("http://www.w3.org/2000/svg", tag.slice(4)) : document.createElement(tag);
+  for (const [key, value] of Object.entries(props)) {
+    if (value == null || value === false) continue;
+    if (key === "text") node.textContent = value;
+    else if (key.startsWith("on")) node.addEventListener(key.slice(2), value);
+    else node.setAttribute(key, value === true ? "" : value);
+  }
+  node.append(...children.flat().filter((c) => c != null));
+  return node;
+}
+
+async function api(path, body = {}) {
+  const response = await fetch(path, {method: "POST", body: JSON.stringify(body),
+    headers: {"Content-Type": "application/json", "X-Token": TOKEN}});
+  const data = await response.json().catch(() => ({}));
+  if (!response.ok || data.error) throw new Error(data.error || `The server answered ${response.status}`);
+  return data;
+}
+
+function fmt(v, digits = 4) {
+  if (v == null || Number.isNaN(v)) return "–";
+  if (typeof v !== "number") return String(v);
+  if (Number.isInteger(v) || Math.abs(v) >= 1e4) return Math.round(v).toLocaleString("en-CA");
+  if (v !== 0 && Math.abs(v) < 1e-3) return v.toExponential(2);
+  return String(Number(v.toPrecision(digits)));
+}
+const tick = (v) => (Math.abs(v) >= 1e5 ? fmt(v) : String(Number(v.toPrecision(6))));  // 2015, not 2,015
+const key = (file, sheet) => `${file}|${sheet || ""}`;
+const pfmt = (p) => (p == null ? "–" : p < 0.001 ? "<0.001" : p.toFixed(3));
+const stars = (p) => (p == null ? "" : p < 0.01 ? "***" : p < 0.05 ? "**" : p < 0.1 ? "*" : "");
+const store = {  // per-viewer conveniences only; the page works without storage
+  get(key) { try { return JSON.parse(localStorage.getItem("portal:" + key)); } catch { return null; } },
+  set(key, value) { try { localStorage.setItem("portal:" + key, JSON.stringify(value)); } catch { /* private window */ } },
+};
+
+// ---- data and form ----
+async function init() {
+  for (const b of document.querySelectorAll("#models button")) b.onclick = () => setModel(b.dataset.model);
+  for (const b of document.querySelectorAll(".tabs button")) b.onclick = () => showTab(b.dataset.tab);
+  $("file").onchange = () => openFile();
+  $("sheet").onchange = () => openFile($("sheet").value);
+  $("xs_mode").onchange = () => { $("xs-period-box").hidden = $("xs_mode").value !== "period"; };
+  $("se").onchange = () => { state.se = $("se").value; };
+  $("unit").onchange = () => { syncErrors(); syncLists(); };
+  for (const id of ["y", "running", "treat"]) $(id).onchange = syncLists;
+  $("run").onclick = run;
+  document.addEventListener("keydown", (e) => { if ((e.ctrlKey || e.metaKey) && e.key === "Enter") run(); });
+  setModel("ols");
+  renderCompare();
+  showTab("data");
+  try {
+    const {folder, files} = await api("/api/files");
+    $("where").textContent = folder;
+    $("file").replaceChildren(...files.map((f) => el("option", {value: f.name, text: `${f.name} · ${(f.bytes / 1024).toFixed(0)} KB`})));
+    if (!files.length) return report($("data"), new Error(`No .xlsx or .csv files in ${folder}. Add one and reload the page.`));
+    const last = store.get("file");
+    if (files.some((f) => f.name === last)) $("file").value = last;
+    await openFile();
+  } catch (error) { report($("data"), error); }
+}
+
+async function openFile(sheet) {
+  const file = $("file").value;
+  $("data").replaceChildren(el("p", {class: "hint", text: `Reading ${file}…`}));
+  try {
+    const p = await api("/api/profile", {file, sheet});
+    state.profile = p;
+    store.set("file", file);
+    $("sheet-box").hidden = p.sheets.length < 2;
+    $("sheet").replaceChildren(...p.sheets.map((s) => el("option", {value: s, text: s})));
+    $("sheet").value = p.sheet;
+    $("file-hint").textContent = `${p.rows.toLocaleString("en-CA")} rows, ${p.columns.length} columns`;
+    for (const select of document.querySelectorAll("select[data-kinds]")) {
+      const kinds = select.dataset.kinds.split(" ");
+      const options = p.columns.filter((c) => kinds.includes(c.kind)).map((c) => el("option", {value: c.name, text: c.label}));
+      select.replaceChildren(...("optional" in select.dataset ? [el("option", {value: "", text: "(none)"})] : []), ...options);
+    }
+    const numbers = p.columns.filter((c) => c.kind === "number");
+    for (const id of ["x", "controls"]) {
+      $(id).replaceChildren(...numbers.map((c) => el("label", {}, el("input", {type: "checkbox", value: c.name, onchange: exclusive}), c.label)));
+    }
+    const g = p.guess;
+    restore(store.get(key(file, p.sheet)) || {y: g.y, x: g.x ? [g.x] : [], unit: g.unit, time: g.time, treat: g.treat, running: g.x});
+    renderData(p);
+  } catch (error) { report($("data"), error); }
+}
+
+function exclusive(event) {  // a variable is either of interest or a control, not both
+  const other = event.target.closest(".checks").id === "x" ? "controls" : "x";
+  if (event.target.checked) $(other).querySelector(`input[value="${CSS.escape(event.target.value)}"]`).checked = false;
+}
+
+function setModel(model) {
+  state.model = model;
+  for (const b of document.querySelectorAll("#models button")) b.setAttribute("aria-pressed", b.dataset.model === model);
+  for (const box of document.querySelectorAll("[data-show]")) box.hidden = !box.dataset.show.split(" ").includes(model);
+  $("model-hint").textContent = HINTS[model];
+  syncErrors();
+  syncLists();
+}
+
+function syncLists() {  // the outcome, the unit, the running variable and treatment date are not regressors
+  const taken = ["y", "unit", {rdd: "running", did: "treat"}[state.model]].filter(Boolean).map((id) => $(id).value);
+  for (const box of document.querySelectorAll("#x input, #controls input")) {
+    box.closest("label").hidden = taken.includes(box.value);
+    if (taken.includes(box.value)) box.checked = false;
+  }
+}
+
+function syncErrors() {  // clustering needs a unit column, and more than one row per unit
+  const cluster = $("se").querySelector('[value="cluster"]');
+  cluster.disabled = state.model === "xs" || !$("unit").value;
+  $("se").value = cluster.disabled && state.se === "cluster" ? "robust" : state.se;
+}
+
+function spec() {
+  const checked = (id) => [...$(id).querySelectorAll("input:checked")].map((i) => i.value);
+  const value = (id) => $(id).value || null;
+  return {
+    file: value("file"), sheet: value("sheet"), model: state.model, y: value("y"), transform: value("transform"),
+    x: checked("x"), controls: checked("controls"), unit: value("unit"), time: value("time"), se: value("se"),
+    fe: ["unit", "time"].filter((k) => $("fe-" + k).checked), xs_mode: value("xs_mode"), xs_period: value("xs_period"),
+    treat: value("treat"), lo: value("lo"), hi: value("hi"), running: value("running"),
+    cutoff: value("cutoff"), bandwidth: value("bandwidth"), kernel: value("kernel"), order: value("order"),
+  };
+}
+
+function restore(s) {
+  for (const [key, value] of Object.entries(s)) {
+    const input = $(key);
+    if (!input || value == null || Array.isArray(value)) continue;
+    if (input.tagName !== "SELECT" || [...input.options].some((o) => o.value === value)) input.value = value;
+  }
+  for (const id of ["x", "controls"]) for (const box of $(id).querySelectorAll("input")) box.checked = (s[id] || []).includes(box.value);
+  for (const k of ["unit", "time"]) if (s.fe) $("fe-" + k).checked = s.fe.includes(k);
+  $("xs-period-box").hidden = $("xs_mode").value !== "period";
+  if (s.se) state.se = s.se;
+  setModel(s.model || state.model);
+}
+
+function showTab(name) {
+  for (const b of document.querySelectorAll(".tabs button")) b.setAttribute("aria-selected", b.dataset.tab === name);
+  for (const id of ["data", "results", "compare"]) $(id).hidden = id !== name;
+}
+
+function report(box, error) {
+  box.replaceChildren(el("div", {class: "card error"}, el("h3", {text: "Something needs fixing"}), el("p", {text: error.message})));
+}
+
+function card(title, ...content) { return el("div", {class: "card"}, el("h3", {text: title}), ...content); }
+
+function table(head, rows) {
+  return el("table", {}, el("thead", {}, el("tr", {}, head.map((h) => el("th", {text: h})))),
+    el("tbody", {}, rows.map((r) => el("tr", {class: r.cls}, r.cells.map((c) => el("td", {text: c}))))));
+}
+
+function renderData(p) {
+  const rows = p.columns.map((c) => ({cells: [c.label, c.kind, fmt(c.missing), fmt(c.unique), fmt(c.mean), fmt(c.sd), fmt(c.min), fmt(c.max)]}));
+  $("data").replaceChildren(
+    el("p", {class: "title", text: `${$("file").value}${p.sheets.length > 1 ? " · " + p.sheet : ""}`}),
+    el("p", {class: "hint", text: "Text such as StatCan's “..” in a number column counts as missing. Pick the model and variables on the left."}),
+    card(`${p.columns.length} columns, ${p.rows.toLocaleString("en-CA")} rows`,
+      table(["Column", "Kind", "Missing", "Distinct", "Mean", "SD", "Min", "Max"], rows)));
+}
+
+// ---- running models ----
+async function run() {
+  const button = $("run");
+  if (button.disabled || !state.profile) return;
+  const s = spec();
+  store.set(key(s.file, s.sheet), s);
+  button.disabled = true;
+  button.textContent = "Estimating…";
+  showTab("results");
+  $("results").replaceChildren(el("p", {class: "hint", text: "Estimating…"}));
+  try { renderResults({...(await api("/api/run", s)), spec: s}); }
+  catch (error) { report($("results"), error); }
+  finally { button.disabled = false; button.textContent = "Run model"; }
+}
+
+function coefficientRows(rows) {
+  return rows.map((r) => ({cls: r.p < 0.05 ? "sig" : null,
+    cells: [r.term, fmt(r.estimate) + stars(r.p), fmt(r.se), fmt(r.t, 3), pfmt(r.p), `${fmt(r.low)} to ${fmt(r.high)}`]}));
+}
+
+function renderResults(r) {
+  const s = r.spec;
+  const what = [s.file, s.sheet, s.model === "rdd" ? `cutoff ${s.cutoff}` : null].filter(Boolean).join(" · ");
+  $("results").replaceChildren(...[
+    el("p", {class: "title", text: r.title}),
+    el("p", {class: "hint", text: what}),
+    el("div", {class: "tiles"}, r.summary.map(([label, value]) =>
+      el("div", {class: "tile"}, el("div", {text: label}), el("div", {text: / p\b/.test(label) ? pfmt(value) : fmt(value)})))),
+    r.notes.length ? card("Notes", el("ul", {class: "notes"}, r.notes.map((n) => el("li", {text: n})))) : null,
+    el("div", {class: "toolbar"},
+      el("button", {type: "button", text: "Pin for comparison", onclick: (e) => { state.pinned.push(r); renderCompare(); e.target.textContent = `Pinned (${state.pinned.length})`; }}),
+      el("button", {type: "button", text: "Download CSV", onclick: () => download(resultCsv(r), "results.csv")}),
+      el("button", {type: "button", text: "Print or save as PDF", onclick: () => window.print()})),
+    ...r.tables.map((t) => card(t.title, table(["Term", "Estimate", "Std. error", "t", "p", "95% interval"], coefficientRows(t.rows)))),
+    el("p", {class: "hint", text: "* p < 0.10, ** p < 0.05, *** p < 0.01. Bold: p < 0.05."}),
+    card("Diagnostics", table(["Check", "Value"], r.diagnostics.map(([k, v]) => ({cells: [k, / p\b/.test(k) ? pfmt(v) : fmt(v)]})))),
+    el("div", {class: "charts"}, r.charts.map((c) => card(c.title, chart(c))))].filter(Boolean));
+}
+
+function renderCompare() {
+  const box = $("compare");
+  const tab = document.querySelector('.tabs [data-tab="compare"]');
+  tab.textContent = state.pinned.length ? `Compare (${state.pinned.length})` : "Compare";
+  if (!state.pinned.length) return box.replaceChildren(el("p", {class: "hint", text: "Pin results to line models up side by side."}));
+  const rows = compareRows();
+  box.replaceChildren(
+    el("div", {class: "toolbar"},
+      el("button", {type: "button", text: "Download CSV", onclick: () => download(rows, "comparison.csv")}),
+      el("button", {type: "button", text: "Clear", onclick: () => { state.pinned = []; renderCompare(); }})),
+    card("Pinned models: estimate (standard error)", table(rows[0], rows.slice(1).map((cells) => ({cells: cells.map((c) => typeof c === "number" ? fmt(c) : c)})))),
+    el("p", {class: "hint", text: "First table of each model. * p < 0.10, ** p < 0.05, *** p < 0.01."}));
+}
+
+function compareRows() {
+  const models = state.pinned;
+  const terms = [...new Set(models.flatMap((m) => m.tables[0].rows.map((r) => r.term)))];
+  const labels = [...new Set(models.flatMap((m) => m.summary.map(([k]) => k)))];
+  const rows = [["", ...models.map((m, i) => `(${i + 1}) ${m.title}`)]];
+  for (const term of terms) {
+    const hits = models.map((m) => m.tables[0].rows.find((r) => r.term === term));
+    rows.push([term, ...hits.map((h) => (h ? fmt(h.estimate) + stars(h.p) : ""))]);
+    rows.push(["", ...hits.map((h) => (h ? `(${fmt(h.se)})` : ""))]);
+  }
+  for (const label of labels) rows.push([label, ...models.map((m) => (m.summary.find(([k]) => k === label) || [])[1] ?? "")]);
+  return rows;
+}
+
+function resultCsv(r) {
+  const rows = [["table", "term", "estimate", "se", "t", "p", "ci_low", "ci_high"]];
+  for (const t of r.tables) for (const x of t.rows) rows.push([t.title, x.term, x.estimate, x.se, x.t, x.p, x.low, x.high]);
+  for (const [k, v] of [...r.summary, ...r.diagnostics]) rows.push(["summary", k, v]);
+  return rows;
+}
+
+function download(rows, name) {
+  const cell = (v) => {
+    let s = v == null ? "" : String(v);
+    if (typeof v === "string" && /^[=+\-@\t\r]/.test(s)) s = "'" + s;  // spreadsheets must not run it as a formula
+    return /[",\r\n]/.test(s) ? `"${s.replaceAll('"', '""')}"` : s;
+  };
+  const url = URL.createObjectURL(new Blob([rows.map((r) => r.map(cell).join(",")).join("\r\n")], {type: "text/csv"}));
+  el("a", {href: url, download: name}).click();
+  setTimeout(() => URL.revokeObjectURL(url), 1000);
+}
+
+// ---- charts: SVG drawn here, with a hover tooltip on the nearest mark ----
+function ticks(a, b, n = 5) {
+  if (!(b > a)) return [a];
+  const raw = (b - a) / n, mag = 10 ** Math.floor(Math.log10(raw)), f = raw / mag;
+  const step = (f < 1.5 ? 1 : f < 3 ? 2 : f < 7 ? 5 : 10) * mag;
+  const out = [];
+  for (let v = Math.ceil(a / step) * step; v <= b + step / 1e6; v += step) out.push(Math.abs(v) < step / 1e6 ? 0 : v);
+  return out;
+}
+
+function span(values, pad) {
+  const v = values.filter(Number.isFinite);
+  if (!v.length) return [0, 1];
+  let a = Math.min(...v), b = Math.max(...v);
+  if (a === b) { a -= Math.abs(a) * 0.1 || 1; b += Math.abs(b) * 0.1 || 1; }
+  return [a - (b - a) * pad, b + (b - a) * pad];
+}
+
+function chart(c) {
+  const series = c.series.filter((s) => s.points.length);
+  const named = series.filter((s) => s.name);
+  const W = 560, H = 330, M = {l: 58, r: 14, t: named.length > 1 ? 30 : 12, b: 44};
+  const xs = [], ys = [];
+  for (const s of series) for (const p of s.points) {
+    if (s.kind === "bars") { xs.push(p[0] - s.width / 2, p[0] + s.width / 2); ys.push(0, p[1]); }
+    else { xs.push(p[0]); ys.push(p[1], ...(p.length > 3 ? [p[2], p[3]] : [])); }
+  }
+  if (c.vline != null) xs.push(c.vline);
+  if (c.hline != null) ys.push(c.hline);
+  const [x0, x1] = span(xs, 0.03), [y0, y1] = span(ys, 0.06);
+  const sx = (v) => M.l + ((v - x0) / (x1 - x0)) * (W - M.l - M.r);
+  const sy = (v) => H - M.b - ((v - y0) / (y1 - y0)) * (H - M.t - M.b);
+  const svg = el("svg:svg", {viewBox: `0 0 ${W} ${H}`, class: "chart", role: "img", "aria-label": c.title});
+  for (const v of ticks(y0, y1)) svg.append(el("svg:line", {class: "grid", x1: M.l, x2: W - M.r, y1: sy(v), y2: sy(v)}),
+    el("svg:text", {x: M.l - 8, y: sy(v) + 4, "text-anchor": "end", text: tick(v)}));
+  for (const v of ticks(x0, x1)) svg.append(el("svg:text", {x: sx(v), y: H - M.b + 16, "text-anchor": "middle", text: tick(v)}));
+  svg.append(el("svg:line", {class: "axis", x1: M.l, x2: W - M.r, y1: H - M.b, y2: H - M.b}),
+    el("svg:text", {class: "label", x: (M.l + W - M.r) / 2, y: H - 8, "text-anchor": "middle", text: c.x}),
+    el("svg:text", {class: "label", transform: "rotate(-90)", x: -(M.t + (H - M.t - M.b) / 2), y: 14, "text-anchor": "middle", text: c.y}));
+  if (c.hline != null) svg.append(el("svg:line", {class: "axis", x1: M.l, x2: W - M.r, y1: sy(c.hline), y2: sy(c.hline)}));
+  if (c.vline != null) svg.append(el("svg:line", {class: "axis", x1: sx(c.vline), x2: sx(c.vline), y1: M.t, y2: H - M.b}));
+  const marks = [];
+  for (const s of series) {
+    const g = el("svg:g", {class: "c" + (s.color ?? 1)});
+    if (s.kind === "line") g.append(el("svg:polyline", {class: "line", points: s.points.map((p) => `${sx(p[0])},${sy(p[1])}`).join(" ")}));
+    s.points.forEach((p, i) => {
+      const x = sx(p[0]), y = sy(p[1]);
+      if (s.kind === "bars") {
+        const left = sx(p[0] - s.width / 2) + 1, right = sx(p[0] + s.width / 2) - 1;  // 2px gap between bars
+        g.append(el("svg:rect", {class: "bar", x: left, y: Math.min(y, sy(0)), width: Math.max(1, right - left), height: Math.abs(sy(0) - y)}));
+      }
+      if (s.kind === "errors") g.append(el("svg:line", {class: "whisker", x1: x, x2: x, y1: sy(p[2]), y2: sy(p[3])}));
+      if (s.kind === "dots" || s.kind === "errors") {
+        g.append(el("svg:circle", {class: s.color === 0 ? "hollow" : s.small ? "dot small" : "dot", cx: x, cy: y, r: s.small ? 2.5 : 4.5}));
+      }
+      marks.push({x, y, s, p, label: s.labels ? s.labels[i] : null});
+    });
+    svg.append(g);
+  }
+  let left = M.l;
+  if (named.length > 1) for (const s of named) {  // legend: a key beside each name, in ink, never in the series colour
+    const g = el("svg:g", {class: "c" + (s.color ?? 1)});
+    g.append(s.kind === "line" ? el("svg:line", {class: "line", x1: left, x2: left + 16, y1: 14, y2: 14})
+      : el("svg:circle", {class: s.color === 0 ? "hollow" : "dot", cx: left + 8, cy: 14, r: 4.5}));
+    const text = el("svg:text", {class: "label", x: left + 22, y: 18, text: s.name});
+    svg.append(g, text);
+    left += 34 + s.name.length * 6.5;
+  }
+  const focus = el("svg:circle", {class: "focus", r: 7, visibility: "hidden"});
+  svg.append(focus);
+  svg.addEventListener("pointermove", (e) => {
+    const point = new DOMPoint(e.clientX, e.clientY).matrixTransform(svg.getScreenCTM().inverse());
+    let best = null, bestD = 30 ** 2;
+    for (const m of marks) {
+      const d = (m.x - point.x) ** 2 + (m.s.kind === "bars" ? 0 : (m.y - point.y) ** 2);
+      if (d < bestD) { best = m; bestD = d; }
+    }
+    if (!best) return hide(focus);
+    focus.setAttribute("cx", best.x);
+    focus.setAttribute("cy", best.y);
+    focus.setAttribute("visibility", "visible");
+    const p = best.p, lines = [best.label ?? `${c.x}: ${fmt(p[0])}`, `${best.s.name || c.y}: ${fmt(p[1])}`];
+    if (p.length > 3) lines.push(`95% interval: ${fmt(p[2])} to ${fmt(p[3])}`);
+    const tip = $("tip");
+    tip.replaceChildren(...lines.map((line) => el("div", {text: line})));
+    tip.hidden = false;
+    tip.style.left = Math.min(e.clientX + 14, innerWidth - tip.offsetWidth - 8) + "px";
+    tip.style.top = e.clientY + 14 + "px";
+  });
+  svg.addEventListener("pointerleave", () => hide(focus));
+  return svg;
+}
+
+function hide(focus) {
+  focus.setAttribute("visibility", "hidden");
+  $("tip").hidden = true;
+}
+
+init();
+</script>
+</body>
+</html>
