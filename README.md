@@ -69,23 +69,56 @@ python portal.py --data ~/thesis/data --port 8800 --no-browser
 ```
 
 Put the `.xlsx` or `.csv` files in `data/` (or pass `--data`), and the page opens in your
-browser. Choose a file (and sheet), a model and its variables, then press **Run model**
-(or Ctrl+Enter). The Data tab describes every column: its kind, missing values, mean,
-standard deviation and range. The page guesses the unit, time, treatment date, outcome
-and score columns from their names, and remembers your settings for each file.
+browser. The sidebar runs in four steps: **1 Data** (the file, its sheet and the control
+group), **2 Panel** (the unit, time and treatment date columns), **3 Model** and
+**4 Variables** (the outcome, variables of interest, controls and the model's own
+options). Press **Run model** (or Ctrl+Enter) for the coefficients, diagnostics,
+summary statistics and charts. **Pin for comparison** lines models up on the Compare
+tab, and each result downloads as CSV or prints to PDF. Hover over a chart for values.
+
+### Treatment and control data
+
+The control group can share a sheet with the treated units (its rows have a blank
+treatment date), or sit in another sheet of the same workbook, or in another file.
+Sheets and files whose names contain "treat" and "control" are paired automatically: a
+workbook with *Treatment* and *Control* sheets opens with the control sheet stacked
+under the treatment sheet. Columns are matched by name, ignoring case, spaces and
+punctuation; the Data tab lists any column found in only one of them, and a unit may not
+appear in both. The summary statistics compare the treated and control units before the
+first treatment, with each variable's standardized difference: beyond about 0.25 either
+way, the groups differ noticeably.
+
+### Where to change things
+
+The page takes its starting point and its models from `portal.py`, so changes are made
+there, in numbered sections:
+
+| Section | What it holds |
+|---|---|
+| 1. `SETTINGS` | the column names (unit, time, treatment date), outcomes, variables of interest and controls; the words that pair sheets; and the model, transform, standard errors, event window and RDD cutoff that the page starts with |
+| 2. `DERIVED` | variables made from other columns, listed in the page under "Made from the data": *treated* (has a treatment date) and *post* (from the treatment period on). Add one with a name, a label and a one-line function |
+| 3. `MODELS` | a function per model, returning its title, summary, tables, diagnostics and charts; and the `MODELS` table, which gives each model its button, hint, inputs and standard errors |
+| 4. to 7. | the building blocks (fitting, diagnostics, summary statistics, charts), reading data, checking requests, and the server |
+
+The Data tab checks each name in `SETTINGS` against the open file, and suggests the
+closest column when one is missing. Restart the portal after editing `portal.py`: the
+page then starts from the new settings. Otherwise it remembers your changes for each
+file, and **Back to the settings** undoes them.
+
+### Models
 
 | Model | Estimates | Also shows |
 |---|---|---|
-| OLS | pooled OLS of the outcome on the regressors and controls | Breusch-Pagan, Jarque-Bera, RESET, largest VIF, Durbin-Watson; the outcome against the first regressor with the others held fixed; residuals |
-| Panel FE | the within estimator, with unit fixed effects, time fixed effects or both | within R²; which regressors the fixed effects absorb |
+| OLS | pooled OLS of the outcome on the variables of interest and controls | Breusch-Pagan, Jarque-Bera, RESET, largest VIF, Durbin-Watson; the outcome against the first variable with the others held fixed; residuals |
+| Panel FE | the within estimator, with unit fixed effects, time fixed effects or both | within R²; which variables the fixed effects absorb |
 | Cross-section | one row per unit: unit averages (the between estimator) or a single period | as OLS, with a dot per unit |
 | DiD | staggered DiD by two-way fixed effects against never-treated units: the average effect after treatment and an event study (reference t = -1) | a pre-trend test; mean outcomes of treated and never-treated units by period |
 | RDD | sharp RD: a local linear or quadratic fit on each side of a cutoff, with a triangular or uniform kernel (default bandwidth: one standard deviation) | a bunching test, placebo jumps in the controls, the jump at other bandwidths |
 
 The outcome can be logged (`log(y)` drops zeros; `log(1 + y)` keeps them). Standard
 errors are clustered by unit, with t and F tests on units - 1 degrees of freedom (as in
-Stata); OLS, the cross-section and RDD can use robust (HC1) or classical errors instead.
-The treatment date column holds each unit's first treated period, blank if never.
+Stata); OLS and RDD can use robust (HC1) or classical errors instead, and the
+cross-section, with one row per unit, uses robust or classical errors.
 
 The pre-trend p-value comes from a wild bootstrap that flips the sign of each unit's
 score (Kline and Santos 2012). With few treated units the usual clustered Wald test
@@ -95,18 +128,14 @@ In panel data the RDD counts units, not rows, since a unit's score repeats in ev
 period. Two-way fixed effects can be biased when effects differ by adoption date;
 `project.py` has did2s and dCDH for that.
 
-**Pin for comparison** lines models up side by side on the Compare tab, and each result
-downloads as CSV or prints to PDF. Charts are drawn in the page; hover over a point for
-its values.
-
 Everything stays on your computer. The server answers only on 127.0.0.1 and checks the
 Host header (against DNS rebinding) and a token made for each session (against other
 websites). It opens only files listed in the data folder, never a path from the page,
-and refuses files over 200 MB. It keeps at most two files in memory, runs
-one model at a time, and draws at most 2,000 points per chart. Column names are never
-turned into code, and the page shows data as plain text, under a strict Content
-Security Policy. It needs numpy, pandas, scipy, statsmodels and openpyxl (with
-defusedxml); a model takes well under a second, and the server uses 200-250 MB.
+and refuses files over 200 MB. It keeps at most four tables in memory, runs one model at
+a time, and draws at most 2,000 points per chart. Column names are never turned into
+code, and the page shows data as plain text, under a strict Content Security Policy. It
+needs numpy, pandas, scipy, statsmodels and openpyxl (with defusedxml); a model takes
+well under a second, and the server uses 200-250 MB.
 
 ## The DiD toolkit: `project.py`
 
@@ -233,4 +262,6 @@ the known effect is recovered), the HTML output and a scripted menu session.
 pre-trend, reads CSV and Excel, and still writes a report when nobody has adopted.
 `test_portal.py` runs the portal's server: its security checks, each model against
 known answers (including that the pre-trend test catches a planted trend but keeps its
-size), and clear messages for bad requests.
+size), the settings matched to a file, treatment and control data in two sheets (giving
+the same results as one sheet), the derived variables and summary statistics, and clear
+messages for bad requests.

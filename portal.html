@@ -16,7 +16,7 @@
     color-scheme: dark;
     --surface: #1a1a19; --page: #0d0d0d; --ink: #ffffff; --ink2: #c3c2b7; --muted: #898781;
     --grid: #2c2c2a; --axis: #383835; --line: rgba(255, 255, 255, .10); --wash: rgba(57, 135, 229, .16);
-    --s1: #3987e5; --s2: #d95926; --s3: #199e70;
+    --s1: #3987e5; --s2: #d95926; --s3: #199e70; --critical: #e66767;
   }
 }
 * { box-sizing: border-box; }
@@ -32,7 +32,8 @@ main { padding: 12px 24px 32px; }
   aside { border-right: 0; border-bottom: 1px solid var(--line); }
   header, aside, main { padding-left: 16px; padding-right: 16px; }
 }
-h2 { font-size: 12px; font-weight: 600; text-transform: uppercase; letter-spacing: .05em; color: var(--ink2); margin: 20px 0 6px; }
+h2 { display: flex; align-items: center; gap: 8px; font-size: 12px; font-weight: 600; text-transform: uppercase; letter-spacing: .05em; color: var(--ink2); margin: 22px 0 6px; }
+.step { display: inline-grid; place-items: center; width: 18px; height: 18px; border-radius: 50%; background: var(--s1); color: #fff; font-size: 11px; letter-spacing: 0; }
 label, .label { display: block; margin: 8px 0 0; color: var(--ink2); font-size: 13px; }
 select, input { display: block; width: 100%; margin-top: 3px; padding: 6px 8px; font: inherit; color: var(--ink); background: var(--page); border: 1px solid var(--axis); border-radius: 6px; }
 input[type=checkbox] { display: inline; width: auto; margin: 0; accent-color: var(--s1); }
@@ -41,11 +42,13 @@ input[type=checkbox] { display: inline; width: auto; margin: 0; accent-color: va
 .seg { display: grid; grid-template-columns: repeat(3, 1fr); gap: 4px; }
 .seg button { padding: 6px 4px; }
 .seg button[aria-pressed=true] { background: var(--s1); border-color: var(--s1); color: #fff; }
-.checks { max-height: 160px; overflow-y: auto; margin-top: 3px; padding: 4px 8px; border: 1px solid var(--axis); border-radius: 6px; background: var(--page); }
+.checks { max-height: 168px; overflow-y: auto; margin-top: 3px; padding: 4px 8px; border: 1px solid var(--axis); border-radius: 6px; background: var(--page); }
 .checks label { display: flex; gap: 8px; align-items: center; margin: 3px 0; color: var(--ink); }
+.checks .sep { margin: 8px 0 2px; color: var(--muted); font-size: 11px; text-transform: uppercase; letter-spacing: .04em; }
 button { font: inherit; padding: 6px 12px; color: var(--ink); background: var(--surface); border: 1px solid var(--axis); border-radius: 6px; cursor: pointer; }
 button:hover { border-color: var(--ink2); }
 button.primary { width: 100%; margin-top: 18px; padding: 10px; color: #fff; background: var(--s1); border-color: var(--s1); font-weight: 600; }
+button.link { padding: 0; border: 0; background: none; color: var(--s1); font-size: 12px; text-decoration: underline; }
 button:disabled { opacity: .6; cursor: progress; }
 .hint { margin: 6px 0 0; color: var(--muted); font-size: 12px; }
 [hidden] { display: none !important; }
@@ -60,11 +63,14 @@ button:disabled { opacity: .6; cursor: progress; }
 .toolbar { display: flex; flex-wrap: wrap; gap: 8px; }
 .card { margin: 12px 0; padding: 12px 14px; background: var(--surface); border: 1px solid var(--line); border-radius: 8px; overflow-x: auto; }
 .card h3 { margin: 0 0 8px; font-size: 13px; font-weight: 600; }
+summary { cursor: pointer; color: var(--ink2); }
 table { width: 100%; border-collapse: collapse; font-variant-numeric: tabular-nums; }
 th, td { padding: 5px 10px; text-align: right; white-space: nowrap; border-bottom: 1px solid var(--grid); }
 th:first-child, td:first-child { text-align: left; }
 th { color: var(--ink2); font-size: 12px; font-weight: 500; }
 tr.sig td:nth-child(2) { font-weight: 600; }
+tr.missing td:last-child { color: var(--critical); }
+.check td:last-child, .check th:last-child { text-align: left; }
 .charts { display: grid; grid-template-columns: repeat(auto-fit, minmax(min(380px, 100%), 1fr)); gap: 0 12px; }
 svg.chart { display: block; width: 100%; height: auto; }
 svg text { fill: var(--muted); font-size: 11px; }
@@ -92,36 +98,46 @@ svg .focus { fill: none; stroke: var(--ink); stroke-width: 1.5; }
 <header><h1>Regression portal</h1><span id="where"></span></header>
 <div class="layout">
 <aside>
-  <h2>Data</h2>
+  <h2><span class="step">1</span>Data</h2>
   <label>File <select id="file"></select></label>
   <label id="sheet-box" hidden>Sheet <select id="sheet"></select></label>
+  <label>Control group <select id="control"></select></label>
   <p class="hint" id="file-hint"></p>
 
-  <h2>Model</h2>
-  <div class="seg" id="models">
-    <button type="button" data-model="ols">OLS</button>
-    <button type="button" data-model="fe">Panel FE</button>
-    <button type="button" data-model="xs">Cross-section</button>
-    <button type="button" data-model="did">DiD</button>
-    <button type="button" data-model="rdd">RDD</button>
+  <h2><span class="step">2</span>Panel</h2>
+  <div class="row">
+    <label>Unit <select id="unit" data-kinds="text number" data-optional></select></label>
+    <label>Time <select id="time" data-kinds="date number text" data-optional></select></label>
   </div>
+  <label>Treatment date <select id="treat" data-kinds="date text number" data-optional></select></label>
+  <p class="hint">When each unit was first treated (its bylaw took effect); blank for control units.</p>
+
+  <h2><span class="step">3</span>Model</h2>
+  <div class="seg" id="models"></div>
   <p class="hint" id="model-hint"></p>
 
-  <h2>Variables</h2>
-  <label>Outcome <select id="y" data-kinds="number"></select></label>
-  <label>Transform <select id="transform">
-    <option value="none">none</option><option value="log1p">log(1 + y), keeps zeros</option><option value="log">log(y)</option>
-  </select></label>
-  <div data-show="ols fe xs"><span class="label">Regressors of interest</span><div class="checks" id="x"></div></div>
-  <div data-show="did">
-    <label>Treatment date <select id="treat" data-kinds="date text number"></select></label>
-    <p class="hint">The period each unit is first treated; blank if never.</p>
-    <div class="row">
-      <label>Event window from <input id="lo" type="number" value="-8" max="-2" step="1"></label>
-      <label>to <input id="hi" type="number" value="8" min="0" step="1"></label>
-    </div>
+  <h2><span class="step">4</span>Variables</h2>
+  <div class="row">
+    <label>Outcome <select id="y" data-kinds="number"></select></label>
+    <label>Transform <select id="transform">
+      <option value="none">none</option><option value="log1p">log(1 + y)</option><option value="log">log(y)</option>
+    </select></label>
   </div>
-  <div data-show="rdd">
+  <!-- Each data-input group shows for the models that list it in MODELS, in portal.py. -->
+  <div data-input="x"><span class="label">Variables of interest</span><div class="checks" id="x"></div></div>
+  <div data-input="controls"><span class="label">Controls</span><div class="checks" id="controls"></div></div>
+  <div data-input="fe"><span class="label">Fixed effects</span>
+    <div class="row checks"><label><input type="checkbox" id="fe-unit" checked> unit</label><label><input type="checkbox" id="fe-time" checked> time</label></div>
+  </div>
+  <div data-input="xs" class="row">
+    <label>One row per unit from <select id="xs_mode"><option value="mean">the average of all periods</option><option value="period">one period</option></select></label>
+    <label id="xs-period-box" hidden>Period <input id="xs_period" placeholder="e.g. 2020Q1"></label>
+  </div>
+  <div data-input="window" class="row">
+    <label>Event window from <input id="lo" type="number" max="-2" step="1"></label>
+    <label>to <input id="hi" type="number" min="0" step="1"></label>
+  </div>
+  <div data-input="rdd">
     <label>Running variable <select id="running" data-kinds="number"></select></label>
     <div class="row">
       <label>Cutoff <input id="cutoff" type="number" step="any"></label>
@@ -132,26 +148,11 @@ svg .focus { fill: none; stroke: var(--ink); stroke-width: 1.5; }
       <label>Fit <select id="order"><option value="1">linear</option><option value="2">quadratic</option></select></label>
     </div>
   </div>
-  <span class="label">Controls</span><div class="checks" id="controls"></div>
+  <label id="se-box">Standard errors <select id="se"></select></label>
+  <p class="hint" id="se-hint"></p>
 
-  <h2>Panel</h2>
-  <div class="row">
-    <label>Unit <select id="unit" data-kinds="text number" data-optional></select></label>
-    <label>Time <select id="time" data-kinds="date number text" data-optional></select></label>
-  </div>
-  <div data-show="fe"><span class="label">Fixed effects</span>
-    <div class="row checks"><label><input type="checkbox" id="fe-unit" checked> unit</label><label><input type="checkbox" id="fe-time" checked> time</label></div>
-  </div>
-  <div data-show="xs" class="row">
-    <label>One row per unit from <select id="xs_mode"><option value="mean">the average of all periods</option><option value="period">one period</option></select></label>
-    <label id="xs-period-box" hidden>Period <input id="xs_period" placeholder="e.g. 2020Q1"></label>
-  </div>
-  <label data-show="ols xs rdd">Standard errors <select id="se">
-    <option value="cluster">clustered by unit</option><option value="robust">robust (HC1)</option><option value="classical">classical</option>
-  </select></label>
-  <p class="hint" data-show="fe did">Standard errors are clustered by unit.</p>
   <button id="run" class="primary" type="button">Run model</button>
-  <p class="hint">Ctrl+Enter also runs it. Settings are remembered for each file.</p>
+  <p class="hint">Ctrl+Enter runs it too. The page starts from SETTINGS in portal.py and remembers your changes for each file. <button type="button" class="link" id="reset">Back to the settings</button></p>
 </aside>
 <main>
   <nav class="tabs" role="tablist">
@@ -167,15 +168,14 @@ svg .focus { fill: none; stroke: var(--ink); stroke-width: 1.5; }
 <div id="tip" hidden></div>
 <script nonce="{{nonce}}">
 "use strict";
+// The page asks portal.py for /api/files (the files, MODELS and DERIVED), /api/profile (a
+// table's columns and the SETTINGS found in them) and /api/run (a model's results). Each
+// model shows the data-input groups it lists in MODELS; the rest of the page is generic.
 const TOKEN = "{{token}}";
 const $ = (id) => document.getElementById(id);
-const state = {profile: null, model: "ols", se: "cluster", pinned: []};
-const HINTS = {
-  ols: "Pooled OLS of the outcome on the regressors and controls.",
-  fe: "The within estimator, with unit fixed effects, time fixed effects or both.",
-  xs: "One row per unit: unit averages (the between estimator) or a single period.",
-  did: "Staggered difference-in-differences against never-treated units: the average effect, an event study and a pre-trend test.",
-  rdd: "Sharp regression discontinuity: local linear or quadratic fits on each side of a cutoff.",
+const state = {
+  files: [], models: {}, errors: {}, derived: {}, settingsId: "", controls: [],
+  profile: null, ask: null, model: null, se: "cluster", pinned: [],
 };
 
 // DOM builder: text always goes through textContent, so data can never inject markup.
@@ -208,64 +208,109 @@ function fmt(v, digits = 4) {
   return String(Number(v.toPrecision(digits)));
 }
 const tick = (v) => (Math.abs(v) >= 1e5 ? fmt(v) : String(Number(v.toPrecision(6))));  // 2015, not 2,015
-const key = (file, sheet) => `${file}|${sheet || ""}`;
+const size = (bytes) => (bytes < 1e6 ? `${Math.ceil(bytes / 1024)} KB` : `${(bytes / 2 ** 20).toFixed(1)} MB`);
 const pfmt = (p) => (p == null ? "–" : p < 0.001 ? "<0.001" : p.toFixed(3));
 const stars = (p) => (p == null ? "" : p < 0.01 ? "***" : p < 0.05 ? "**" : p < 0.1 ? "*" : "");
 const store = {  // per-viewer conveniences only; the page works without storage
   get(key) { try { return JSON.parse(localStorage.getItem("portal:" + key)); } catch { return null; } },
   set(key, value) { try { localStorage.setItem("portal:" + key, JSON.stringify(value)); } catch { /* private window */ } },
 };
+const memoryKey = (ask) => [state.settingsId, ask.file, ask.sheet, ask.control_file, ask.control_sheet].join("|");
 
-// ---- data and form ----
+// ---- setting up: files, models, columns ----
 async function init() {
-  for (const b of document.querySelectorAll("#models button")) b.onclick = () => setModel(b.dataset.model);
-  for (const b of document.querySelectorAll(".tabs button")) b.onclick = () => showTab(b.dataset.tab);
-  $("file").onchange = () => openFile();
-  $("sheet").onchange = () => openFile($("sheet").value);
+  $("file").onchange = () => openFile("file");
+  $("sheet").onchange = () => openFile("sheet");
+  $("control").onchange = () => openFile("control");
   $("xs_mode").onchange = () => { $("xs-period-box").hidden = $("xs_mode").value !== "period"; };
   $("se").onchange = () => { state.se = $("se").value; };
   $("unit").onchange = () => { syncErrors(); syncLists(); };
   for (const id of ["y", "running", "treat"]) $(id).onchange = syncLists;
+  $("reset").onclick = () => { if (state.ask) { store.set(memoryKey(state.ask), null); apply(state.profile.defaults); } };
   $("run").onclick = run;
+  for (const b of document.querySelectorAll(".tabs button")) b.onclick = () => showTab(b.dataset.tab);
   document.addEventListener("keydown", (e) => { if ((e.ctrlKey || e.metaKey) && e.key === "Enter") run(); });
-  setModel("ols");
   renderCompare();
   showTab("data");
   try {
-    const {folder, files} = await api("/api/files");
-    $("where").textContent = folder;
-    $("file").replaceChildren(...files.map((f) => el("option", {value: f.name, text: `${f.name} · ${(f.bytes / 1024).toFixed(0)} KB`})));
-    if (!files.length) return report($("data"), new Error(`No .xlsx or .csv files in ${folder}. Add one and reload the page.`));
+    const setup = await api("/api/files");
+    Object.assign(state, {files: setup.files, models: setup.models, errors: setup.errors, derived: setup.derived, settingsId: setup.settings_id});
+    $("where").textContent = setup.folder;
+    $("models").replaceChildren(...Object.entries(setup.models).map(([key, m]) =>
+      el("button", {type: "button", "data-model": key, text: m.label, onclick: () => setModel(key)})));
+    setModel(Object.keys(setup.models)[0]);
+    if (!setup.files.length) return report($("data"), new Error(`No .xlsx or .csv files in ${setup.folder}. Add one and reload the page.`));
+    $("file").replaceChildren(...setup.files.map((f) => el("option", {value: f.name, text: `${f.name} · ${size(f.bytes)}`})));
     const last = store.get("file");
-    if (files.some((f) => f.name === last)) $("file").value = last;
-    await openFile();
+    $("file").value = setup.files.some((f) => f.name === last) ? last : setup.open;
+    await openFile("file");
   } catch (error) { report($("data"), error); }
 }
 
-async function openFile(sheet) {
-  const file = $("file").value;
-  $("data").replaceChildren(el("p", {class: "hint", text: `Reading ${file}…`}));
+async function openFile(change) {  // change: "file", "sheet" or "control"
+  const f = state.files.find((x) => x.name === $("file").value);
+  if (change === "file") {
+    $("sheet").replaceChildren(...f.sheets.map((s) => el("option", {value: s, text: s})));
+    $("sheet").value = f.sheet;
+    $("sheet-box").hidden = f.sheets.length < 2;
+  }
+  if (change !== "control") fillControl(f, change === "file" ? f.control || {} : null);  // a new file: its own pairing
+  const c = state.controls[$("control").value] || {};
+  const ask = {file: f.name, sheet: $("sheet").value || null, control_file: c.file || null, control_sheet: c.sheet || null};
+  $("data").replaceChildren(el("p", {class: "hint", text: `Reading ${f.name}…`}));
   try {
-    const p = await api("/api/profile", {file, sheet});
-    state.profile = p;
-    store.set("file", file);
-    $("sheet-box").hidden = p.sheets.length < 2;
-    $("sheet").replaceChildren(...p.sheets.map((s) => el("option", {value: s, text: s})));
-    $("sheet").value = p.sheet;
-    $("file-hint").textContent = `${p.rows.toLocaleString("en-CA")} rows, ${p.columns.length} columns`;
-    for (const select of document.querySelectorAll("select[data-kinds]")) {
-      const kinds = select.dataset.kinds.split(" ");
-      const options = p.columns.filter((c) => kinds.includes(c.kind)).map((c) => el("option", {value: c.name, text: c.label}));
-      select.replaceChildren(...("optional" in select.dataset ? [el("option", {value: "", text: "(none)"})] : []), ...options);
-    }
-    const numbers = p.columns.filter((c) => c.kind === "number");
-    for (const id of ["x", "controls"]) {
-      $(id).replaceChildren(...numbers.map((c) => el("label", {}, el("input", {type: "checkbox", value: c.name, onchange: exclusive}), c.label)));
-    }
-    const g = p.guess;
-    restore(store.get(key(file, p.sheet)) || {y: g.y, x: g.x ? [g.x] : [], unit: g.unit, time: g.time, treat: g.treat, running: g.x});
+    const p = await api("/api/profile", ask);
+    Object.assign(state, {profile: p, ask});
+    store.set("file", f.name);
+    const groups = Object.entries(p.groups).map(([g, n]) => `${n.toLocaleString("en-CA")} ${g}`).join(", ");
+    $("file-hint").textContent = `${p.rows.toLocaleString("en-CA")} rows${groups ? ` (${groups})` : ""}, ${p.columns.length} columns`;
+    fillColumns(p);
+    apply(store.get(memoryKey(ask)) || p.defaults);
     renderData(p);
   } catch (error) { report($("data"), error); }
+}
+
+function fillControl(f, preferred) {  // where the control group's rows come from
+  const sheet = $("sheet").value;
+  const choices = [{text: "Rows with no treatment date (in this sheet)", file: "", sheet: ""}];
+  for (const s of f.sheets) if (s !== sheet) choices.push({text: `Sheet: ${s}`, file: f.name, sheet: s});
+  for (const g of state.files) {
+    if (g.name === f.name) continue;
+    for (const s of g.sheets.length ? g.sheets : [""]) choices.push({text: g.sheets.length > 1 ? `${g.name} › ${s}` : g.name, file: g.name, sheet: s});
+  }
+  const want = preferred || state.controls[$("control").value] || {};
+  state.controls = choices;
+  $("control").replaceChildren(...choices.map((c, i) => el("option", {value: i, text: c.text})));
+  $("control").value = Math.max(0, choices.findIndex((c) => c.file === (want.file || "") && c.sheet === (want.sheet || "")));
+}
+
+function fillColumns(p) {  // the column menus and checklists, from this table's columns
+  for (const select of document.querySelectorAll("select[data-kinds]")) {
+    const kinds = select.dataset.kinds.split(" ");
+    const options = p.columns.filter((c) => kinds.includes(c.kind)).map((c) => el("option", {value: c.name, text: c.label}));
+    select.replaceChildren(...("optional" in select.dataset ? [el("option", {value: "", text: "(none)"})] : []), ...options);
+  }
+  const names = new Set(p.columns.map((c) => c.name));
+  const derived = Object.entries(state.derived).filter(([name]) => !names.has(name));
+  const item = (name, label) => el("label", {}, el("input", {type: "checkbox", value: name, onchange: exclusive}), label);
+  for (const id of ["x", "controls"]) {
+    $(id).replaceChildren(...p.columns.filter((c) => c.kind === "number").map((c) => item(c.name, c.label)),
+      derived.length ? el("div", {class: "sep", text: "Made from the data (DERIVED)"}) : "",
+      ...derived.map(([name, label]) => item(name, label)));
+  }
+}
+
+function apply(s) {  // fill the form from remembered choices, or the SETTINGS defaults
+  for (const id of ["y", "transform", "unit", "time", "treat", "running", "kernel", "order", "xs_mode"]) {
+    const value = String(s[id] ?? "");
+    if ([...$(id).options].some((o) => o.value === value)) $(id).value = value;
+  }
+  for (const id of ["cutoff", "bandwidth", "lo", "hi", "xs_period"]) if (id in s) $(id).value = s[id] ?? "";
+  for (const id of ["x", "controls"]) for (const box of $(id).querySelectorAll("input")) box.checked = (s[id] || []).includes(box.value);
+  for (const k of ["unit", "time"]) $("fe-" + k).checked = (s.fe || ["unit", "time"]).includes(k);
+  $("xs-period-box").hidden = $("xs_mode").value !== "period";
+  if (s.se) state.se = s.se;
+  setModel(s.model);
 }
 
 function exclusive(event) {  // a variable is either of interest or a control, not both
@@ -273,54 +318,47 @@ function exclusive(event) {  // a variable is either of interest or a control, n
   if (event.target.checked) $(other).querySelector(`input[value="${CSS.escape(event.target.value)}"]`).checked = false;
 }
 
-function setModel(model) {
-  state.model = model;
-  for (const b of document.querySelectorAll("#models button")) b.setAttribute("aria-pressed", b.dataset.model === model);
-  for (const box of document.querySelectorAll("[data-show]")) box.hidden = !box.dataset.show.split(" ").includes(model);
-  $("model-hint").textContent = HINTS[model];
+function setModel(key) {
+  state.model = state.models[key] ? key : Object.keys(state.models)[0];
+  const m = state.models[state.model];
+  for (const b of $("models").children) b.setAttribute("aria-pressed", b.dataset.model === state.model);
+  for (const box of document.querySelectorAll("[data-input]")) box.hidden = !m.inputs.includes(box.dataset.input);
+  $("model-hint").textContent = m.hint;
   syncErrors();
   syncLists();
 }
 
-function syncLists() {  // the outcome, the unit, the running variable and treatment date are not regressors
-  const taken = ["y", "unit", {rdd: "running", did: "treat"}[state.model]].filter(Boolean).map((id) => $(id).value);
-  for (const box of document.querySelectorAll("#x input, #controls input")) {
-    box.closest("label").hidden = taken.includes(box.value);
-    if (taken.includes(box.value)) box.checked = false;
-  }
+function syncErrors() {  // the model's choice of standard errors; clustering needs a unit column
+  const m = state.models[state.model];
+  const usable = m.errors.filter((e) => e !== "cluster" || $("unit").value);
+  const options = usable.length ? usable : m.errors;
+  $("se").replaceChildren(...options.map((e) => el("option", {value: e, text: state.errors[e]})));
+  $("se").value = options.includes(state.se) ? state.se : options[0];
+  $("se-box").hidden = options.length < 2;
+  $("se-hint").textContent = options.length < 2 ? `Standard errors: ${state.errors[options[0]]}.` : "";
 }
 
-function syncErrors() {  // clustering needs a unit column, and more than one row per unit
-  const cluster = $("se").querySelector('[value="cluster"]');
-  cluster.disabled = state.model === "xs" || !$("unit").value;
-  $("se").value = cluster.disabled && state.se === "cluster" ? "robust" : state.se;
+function syncLists() {  // hide the outcome, unit, treatment date and running variable; portal.py ignores them as regressors
+  const m = state.models[state.model];
+  const taken = [$("y").value, $("unit").value, $("treat").value, m.inputs.includes("rdd") ? $("running").value : null];
+  for (const box of document.querySelectorAll("#x input, #controls input")) box.closest("label").hidden = taken.includes(box.value);
 }
 
-function spec() {
-  const checked = (id) => [...$(id).querySelectorAll("input:checked")].map((i) => i.value);
+function ticked(id, hidden = false) {  // a checklist's ticked variables (hidden ones too, if asked)
+  return [...$(id).querySelectorAll("input:checked")].filter((i) => hidden || !i.closest("label").hidden).map((i) => i.value);
+}
+
+function spec() {  // the request for /api/run: every input, named as portal.py reads it
   const value = (id) => $(id).value || null;
   return {
-    file: value("file"), sheet: value("sheet"), model: state.model, y: value("y"), transform: value("transform"),
-    x: checked("x"), controls: checked("controls"), unit: value("unit"), time: value("time"), se: value("se"),
-    fe: ["unit", "time"].filter((k) => $("fe-" + k).checked), xs_mode: value("xs_mode"), xs_period: value("xs_period"),
-    treat: value("treat"), lo: value("lo"), hi: value("hi"), running: value("running"),
-    cutoff: value("cutoff"), bandwidth: value("bandwidth"), kernel: value("kernel"), order: value("order"),
+    ...state.ask, model: state.model, y: value("y"), transform: value("transform"), x: ticked("x"), controls: ticked("controls"),
+    unit: value("unit"), time: value("time"), treat: value("treat"), se: value("se"), fe: ["unit", "time"].filter((k) => $("fe-" + k).checked),
+    xs_mode: value("xs_mode"), xs_period: value("xs_period"), lo: value("lo"), hi: value("hi"),
+    running: value("running"), cutoff: value("cutoff"), bandwidth: value("bandwidth"), kernel: value("kernel"), order: value("order"),
   };
 }
 
-function restore(s) {
-  for (const [key, value] of Object.entries(s)) {
-    const input = $(key);
-    if (!input || value == null || Array.isArray(value)) continue;
-    if (input.tagName !== "SELECT" || [...input.options].some((o) => o.value === value)) input.value = value;
-  }
-  for (const id of ["x", "controls"]) for (const box of $(id).querySelectorAll("input")) box.checked = (s[id] || []).includes(box.value);
-  for (const k of ["unit", "time"]) if (s.fe) $("fe-" + k).checked = s.fe.includes(k);
-  $("xs-period-box").hidden = $("xs_mode").value !== "period";
-  if (s.se) state.se = s.se;
-  setModel(s.model || state.model);
-}
-
+// ---- tabs and cards ----
 function showTab(name) {
   for (const b of document.querySelectorAll(".tabs button")) b.setAttribute("aria-selected", b.dataset.tab === name);
   for (const id of ["data", "results", "compare"]) $(id).hidden = id !== name;
@@ -332,18 +370,27 @@ function report(box, error) {
 
 function card(title, ...content) { return el("div", {class: "card"}, el("h3", {text: title}), ...content); }
 
-function table(head, rows) {
-  return el("table", {}, el("thead", {}, el("tr", {}, head.map((h) => el("th", {text: h})))),
+function table(head, rows, cls) {
+  return el("table", {class: cls}, el("thead", {}, el("tr", {}, head.map((h) => el("th", {text: h})))),
     el("tbody", {}, rows.map((r) => el("tr", {class: r.cls}, r.cells.map((c) => el("td", {text: c}))))));
 }
 
 function renderData(p) {
+  const control = state.controls[$("control").value];
+  const where = [p.file, p.sheets.length > 1 ? p.sheet : null].filter(Boolean).join(" · ") + (control.file ? ` + ${control.text}` : "");
+  const found = p.check.filter((c) => c.found).length;
+  const check = p.check.map((c) => ({cls: c.found ? null : "missing",
+    cells: [c.setting, c.name, c.found ? `✓ ${c.found}` : `✗ not in this table${c.note ? ` (${c.note})` : ""}`]}));
   const rows = p.columns.map((c) => ({cells: [c.label, c.kind, fmt(c.missing), fmt(c.unique), fmt(c.mean), fmt(c.sd), fmt(c.min), fmt(c.max)]}));
-  $("data").replaceChildren(
-    el("p", {class: "title", text: `${$("file").value}${p.sheets.length > 1 ? " · " + p.sheet : ""}`}),
-    el("p", {class: "hint", text: "Text such as StatCan's “..” in a number column counts as missing. Pick the model and variables on the left."}),
+  $("data").replaceChildren(...[
+    el("p", {class: "title", text: where}),
+    el("p", {class: "hint", text: "Text such as StatCan's “..” in a number column counts as missing."}),
+    p.notes.length ? card("Notes", el("ul", {class: "notes"}, p.notes.map((n) => el("li", {text: n})))) : null,
+    card(`SETTINGS in portal.py: ${found} of ${p.check.length} names found in this table`,
+      el("details", {open: found < p.check.length}, el("summary", {text: "Each setting"}), table(["Setting", "Name", "In this table"], check, "check"))),
     card(`${p.columns.length} columns, ${p.rows.toLocaleString("en-CA")} rows`,
-      table(["Column", "Kind", "Missing", "Distinct", "Mean", "SD", "Min", "Max"], rows)));
+      table(["Column", "Kind", "Missing", "Distinct", "Mean", "SD", "Min", "Max"], rows)),
+  ].filter(Boolean));
 }
 
 // ---- running models ----
@@ -351,7 +398,7 @@ async function run() {
   const button = $("run");
   if (button.disabled || !state.profile) return;
   const s = spec();
-  store.set(key(s.file, s.sheet), s);
+  store.set(memoryKey(state.ask), {...s, x: ticked("x", true), controls: ticked("controls", true)});
   button.disabled = true;
   button.textContent = "Estimating…";
   showTab("results");
@@ -367,11 +414,11 @@ function coefficientRows(rows) {
 }
 
 function renderResults(r) {
-  const s = r.spec;
-  const what = [s.file, s.sheet, s.model === "rdd" ? `cutoff ${s.cutoff}` : null].filter(Boolean).join(" · ");
+  const s = r.spec, stats = r.stats;
+  const what = [s.file, s.sheet, s.control_file ? `+ ${s.control_sheet || s.control_file}` : null, s.model === "rdd" ? `cutoff ${s.cutoff}` : null];
   $("results").replaceChildren(...[
     el("p", {class: "title", text: r.title}),
-    el("p", {class: "hint", text: what}),
+    el("p", {class: "hint", text: what.filter(Boolean).join(" · ")}),
     el("div", {class: "tiles"}, r.summary.map(([label, value]) =>
       el("div", {class: "tile"}, el("div", {text: label}), el("div", {text: / p\b/.test(label) ? pfmt(value) : fmt(value)})))),
     r.notes.length ? card("Notes", el("ul", {class: "notes"}, r.notes.map((n) => el("li", {text: n})))) : null,
@@ -382,7 +429,10 @@ function renderResults(r) {
     ...r.tables.map((t) => card(t.title, table(["Term", "Estimate", "Std. error", "t", "p", "95% interval"], coefficientRows(t.rows)))),
     el("p", {class: "hint", text: "* p < 0.10, ** p < 0.05, *** p < 0.01. Bold: p < 0.05."}),
     card("Diagnostics", table(["Check", "Value"], r.diagnostics.map(([k, v]) => ({cells: [k, / p\b/.test(k) ? pfmt(v) : fmt(v)]})))),
-    el("div", {class: "charts"}, r.charts.map((c) => card(c.title, chart(c))))].filter(Boolean));
+    card(stats.title, table(stats.columns, stats.rows.map((row) => ({cells: row.map((v, i) => (i ? fmt(v) : v))}))),
+      stats.note ? el("p", {class: "hint", text: stats.note}) : null),
+    el("div", {class: "charts"}, r.charts.map((c) => card(c.title, chart(c)))),
+  ].filter(Boolean));
 }
 
 function renderCompare() {
@@ -417,6 +467,7 @@ function resultCsv(r) {
   const rows = [["table", "term", "estimate", "se", "t", "p", "ci_low", "ci_high"]];
   for (const t of r.tables) for (const x of t.rows) rows.push([t.title, x.term, x.estimate, x.se, x.t, x.p, x.low, x.high]);
   for (const [k, v] of [...r.summary, ...r.diagnostics]) rows.push(["summary", k, v]);
+  rows.push([], [r.stats.title, ...r.stats.columns], ...r.stats.rows.map((row) => ["", ...row]));
   return rows;
 }
 

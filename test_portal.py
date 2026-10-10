@@ -44,9 +44,17 @@ def panel(units: int = 60, periods: int = 32, pre_trend: float = 0.0, seed: int 
 @pytest.fixture(scope="module")
 def server(tmp_path_factory):
     folder = tmp_path_factory.mktemp("data")
-    panel().to_csv(folder / "panel.csv", index=False)
-    panel().to_excel(folder / "panel.xlsx", index=False, sheet_name="data")
+    frame = panel()
+    frame.to_csv(folder / "panel.csv", index=False)
+    frame.to_excel(folder / "panel.xlsx", index=False, sheet_name="data")
     panel(pre_trend=0.01).to_csv(folder / "pretrend.csv", index=False)
+    treated = frame["Treatment date"] != ""
+    control = frame[~treated].drop(columns="Treatment date")  # no bylaw data for controls
+    with pd.ExcelWriter(folder / "split.xlsx") as book:  # the groups in two sheets
+        frame[treated].to_excel(book, sheet_name="Treatment", index=False)
+        control.rename(columns={"Census Division": "census division"}).to_excel(
+            book, sheet_name="Control", index=False
+        )
     (folder / "notes.txt").write_text("not data")
     (folder / "~$panel.xlsx").write_text("an Excel lock file")
     portal = P.Portal(folder, 0)
@@ -76,6 +84,8 @@ def call(server, path, body=None, token=None, host=None, kind="application/json"
 
 
 BASE = {"file": "panel.csv", "unit": "census_division", "time": "date", "y": "permits"}
+SPLIT = {"file": "split.xlsx", "sheet": "Treatment", "control_file": "split.xlsx"}
+SPLIT |= {"control_sheet": "Control"}
 
 
 def run(server, **spec):
@@ -101,15 +111,59 @@ def test_page_and_security(server):
     assert call(server, "/api/run", BASE | {"x": ["x" * 70_000]})[0] == 413
 
 
-def test_files_and_profile(server):
-    _, files, _ = call(server, "/api/files", {})
-    assert [f["name"] for f in files["files"]] == ["panel.csv", "panel.xlsx", "pretrend.csv"]
+def test_files_models_and_pairs(server):
+    _, setup, _ = call(server, "/api/files", {})
+    files = {f["name"]: f for f in setup["files"]}
+    assert list(files) == ["panel.csv", "panel.xlsx", "pretrend.csv", "split.xlsx"]
+    assert files["split.xlsx"]["sheet"] == "Treatment" and setup["open"] == "split.xlsx"
+    assert files["split.xlsx"]["control"] == {"file": "split.xlsx", "sheet": "Control"}
+    assert files["panel.csv"]["control"] is None
+    assert list(setup["models"]) == list(P.MODELS)  # the page's buttons come from MODELS
+    assert setup["models"]["did"]["inputs"] == ["controls", "window"]
+    assert set(setup["derived"]) == set(P.DERIVED)
+
+
+def test_pairing_by_name():
+    files = {"control.xlsx": ["Sheet1"], "treatment.xlsx": ["Sheet1"], "other.csv": []}
+    first, pairs = P.pairing(files)
+    assert first == "treatment.xlsx" and pairs["other.csv"]["control"] is None
+    assert pairs["treatment.xlsx"]["control"] == {"file": "control.xlsx", "sheet": "Sheet1"}
+    first, pairs = P.pairing({"final.xlsx": ["Notes", "Treated", "Controls"]})
+    control = {"file": "final.xlsx", "sheet": "Controls"}
+    assert first == "final.xlsx" and pairs["final.xlsx"] == {"sheet": "Treated", "control": control}
+
+
+def test_profile_starts_from_the_settings(server):
     _, profile, _ = call(server, "/api/profile", {"file": "panel.xlsx"})
     assert profile["sheets"] == ["data"] and profile["rows"] == 60 * 32
     kinds = {c["name"]: c["kind"] for c in profile["columns"]}
     assert kinds["score"] == "number" and kinds["date"] == "date" and kinds["notes"] == "text"
-    guess = {"unit": "census_division", "time": "date", "treat": "treatment_date"}
-    assert profile["guess"] == guess | {"y": "permits", "x": "score"}
+    start = profile["defaults"]
+    roles = start["unit"], start["time"], start["treat"], start["y"], start["running"]
+    assert roles == ("census_division", "date", "treatment_date", "permits", "score")
+    assert start["x"] == ["score"] and start["controls"] == []  # no default control is here
+    check = {(c["setting"], c["name"]): c for c in profile["check"]}
+    assert check["UNIT", "census_division"]["found"] == "Census Division"
+    assert check["OUTCOMES", "starts"]["found"] is None
+
+
+def test_treatment_and_control_in_two_sheets(server):
+    _, profile, _ = call(server, "/api/profile", SPLIT)
+    assert profile["groups"] == {"treatment": 30 * 32, "control": 30 * 32}
+    assert profile["notes"] == ["Only in the treatment data: Treatment date"]
+    spec = {"model": "did", "treat": "treatment_date", "controls": ["x"], "lo": -6}
+    stacked, one_sheet = run(server, **SPLIT, **spec), run(server, **spec)
+    effect = estimate(one_sheet, "Post (treated)")
+    assert estimate(stacked, "Post (treated)") == pytest.approx(effect, rel=1e-4)
+    assert dict(stacked["summary"])["Never-treated units"] == 30
+    clash = SPLIT | {"control_file": "panel.csv", "control_sheet": None}  # all units again
+    status, reply, _ = call(server, "/api/run", BASE | clash | spec)
+    assert status == 400 and "is in both the treatment and the control data" in reply["error"]
+    alone = {"file": "split.xlsx", "sheet": "Treatment"}  # no control group chosen
+    status, reply, _ = call(server, "/api/run", BASE | alone | spec)
+    assert status == 400 and "not 30 and 0: choose the control group" in reply["error"]
+    same = SPLIT | {"control_sheet": "Treatment"}
+    assert "another sheet or file" in call(server, "/api/profile", same)[1]["error"]
 
 
 def test_models_recover_known_answers(server):
@@ -146,6 +200,36 @@ def test_did_and_its_pretrend_test(server):
     assert not any("No treated rows" in n for n in wide["notes"])
 
 
+def test_derived_variables(server):
+    ols = run(
+        server, model="ols", x=["score"], controls=["treated", "post"], treat="treatment_date"
+    )
+    assert estimate(ols, P.DERIVED["post"][0]) == pytest.approx(0.2, abs=0.08)
+    status, reply, _ = call(server, "/api/run", BASE | {"model": "ols", "x": ["post"]})
+    assert status == 400 and "needs the treatment date" in reply["error"]
+
+
+def test_summary_statistics(server):
+    stats = run(server, model="ols", x=["score", "x"], treat="treatment_date")["stats"]
+    assert stats["columns"][:6] == ["Variable", "N", "Mean", "SD", "Min", "Max"]
+    assert stats["columns"][6].startswith("Treated, before ") and stats["note"]
+    rows = {r[0]: r for r in stats["rows"]}
+    assert list(rows) == ["Permits", "Score", "X"] and rows["Score"][1] == 60 * 32
+    assert abs(rows["X"][8]) < 0.25  # pure noise: the groups match
+    plain = run(server, model="ols", x=["score"])["stats"]  # no treatment date chosen
+    assert len(plain["columns"]) == 6 and plain["note"] is None
+
+
+def test_group_notes():
+    data = pd.DataFrame({"_unit": ["a", "a", "b", "c"], "_adopted": [5.0, 5.0, np.nan, 3.0]})
+    group = pd.Series(["treatment", "treatment", "treatment", "control"])
+    notes = P.group_notes(group, data)
+    assert notes == [
+        "Treatment units without a treatment date, so counted as controls: 1",
+        "Control units with a treatment date, so counted as treated: 1",
+    ]
+
+
 def test_wild_bootstrap_keeps_its_size():
     """With 30 clusters, a clustered Wald test of 3 coefficients rejects true nulls too often."""
     rng = np.random.default_rng(0)
@@ -160,17 +244,19 @@ def test_wild_bootstrap_keeps_its_size():
 
 def test_bad_requests_get_clear_messages(server):
     cases = [
-        ({"model": "ols"}, "Choose at least one regressor"),
+        ({"model": "nope"}, "model must be one of ols, fe"),
+        ({"model": "ols"}, "Choose at least one variable of interest or control"),
         ({"model": "ols", "x": ["nope"]}, "Unknown column in x: 'nope'"),
         ({"model": "ols", "x": [1]}, "x must be a list of column names"),
         ({"model": "ols", "x": ["score"], "y": ["permits"]}, "Unknown column for the outcome"),
         ({"model": "ols", "x": ["score"], "unit": ""}, "Clustered errors need the unit"),
-        ({"model": "did", "x": ["score"]}, "treatment date"),
+        ({"model": "did", "controls": ["x"]}, "Choose the treatment date column"),
         ({"model": "rdd", "running": "score"}, "cutoff"),
         ({"model": "rdd", "running": "score", "cutoff": 5, "bandwidth": 0}, "must be positive"),
         ({"model": "ols", "x": ["score"], "transform": "sqrt"}, "transform must be"),
         ({"model": "fe", "x": ["score"], "fe": ["unit"]}, "absorbed"),
-        ({"model": "fe", "x": ["x"], "fe": []}, "Choose unit fixed effects"),
+        ({"model": "fe", "x": ["x"], "fe": []}, "Choose unit or time fixed effects"),
+        ({"model": "xs", "x": ["x"], "se": "cluster"}, "se must be one of robust, classical"),
         ({"model": "xs", "x": ["x"], "xs_mode": "period", "xs_period": "1990Q1"}, "No rows"),
         ({"model": "ols", "x": ["score"], "time": "notes"}, "Cannot read '<script>"),
     ]
